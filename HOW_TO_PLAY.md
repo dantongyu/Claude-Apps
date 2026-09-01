@@ -322,7 +322,12 @@ Wait about a minute, then your game is live at:
 
 **https://dantongyu.github.io/Claude-Apps/**
 
-Every push to `main` republishes it automatically. Once it's up, point people at
+Every push to `main` republishes it automatically.
+
+The repo includes an empty **`.nojekyll`** file at the root. Do not delete it:
+GitHub Pages runs Jekyll by default, and Jekyll silently excludes `vendor/` from
+the published site — which is exactly where three.js lives. Without that file the
+page loads but the game never starts. Once it's up, point people at
 that link instead of the repo — Option A above becomes the only instruction most
 of them need.
 
