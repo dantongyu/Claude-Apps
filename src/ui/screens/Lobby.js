@@ -5,6 +5,18 @@ import { itemName, itemColor } from '../../inventory/Item.js';
 import { activeSkinColor } from '../../economy/Shop.js';
 import { State } from '../../core/GameState.js';
 
+const REPO_URL = 'https://github.com/dantongyu/Claude-Apps';
+const GUIDE_URL = 'https://github.com/dantongyu/Claude-Apps/blob/main/HOW_TO_PLAY.md';
+
+// Opens in a new tab so a player mid-session never loses their place.
+function externalLink(label, href) {
+  return h('a', {
+    class: 'btn ghost small link',
+    text: label,
+    attrs: { href, target: '_blank', rel: 'noopener noreferrer' },
+  });
+}
+
 export function renderLobby(root, app) {
   const p = app.profile;
   const prog = levelProgress(p);
@@ -52,6 +64,11 @@ export function renderLobby(root, app) {
     ),
     stats,
     h('p', { class: 'hint', text: 'WASD move · Shift sprint · Space jump · Mouse aim & fire · R reload · E interact · F use · G drop · 1-5 slots · Esc pause' }),
+    h('div', { class: 'links' },
+      externalLink('◆ SOURCE CODE', REPO_URL),
+      externalLink('📖 HOW TO PLAY', GUIDE_URL),
+      h('span', { class: 'links-note', text: 'Open source — clone it and keep building.' }),
+    ),
   ));
 }
 
