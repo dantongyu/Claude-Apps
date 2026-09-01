@@ -6,6 +6,10 @@ extract → shop, with progress that persists across reloads.
 No build step, no package manager, no engine install. It is plain ES modules with
 three.js vendored into the repo, so it runs off any static server.
 
+> **Playing rather than building? Start with [HOW_TO_PLAY.md](HOW_TO_PLAY.md)** — the
+> full player's guide: setup, controls, the weapon and rarity tables, enemies,
+> missions, and troubleshooting. The rest of this file is for developers.
+
 ## Play
 
 ```bash
