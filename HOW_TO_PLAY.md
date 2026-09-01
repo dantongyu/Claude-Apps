@@ -8,30 +8,69 @@ No install, no account. If you can open a web page, you can play.
 
 ---
 
-## 1. Starting the game
+## 1. Getting the game
 
-You need a local web server — browsers block the game's files if you open
-`index.html` directly from your hard drive.
+There are three ways in. **Pick the first one that applies to you.**
 
-**macOS / Linux** (Python is already installed):
+### Option A — Play online (easiest, nothing to install)
+
+If the repo owner has turned on GitHub Pages, the game is already live:
+
+**https://dantongyu.github.io/Claude-Apps/**
+
+Click it and play. No download, no terminal, nothing to set up. Works on any
+modern browser — Chrome, Firefox, Edge, or Safari.
+
+*(Owner: see "Publishing the game" at the bottom of this file to switch this on.
+It takes about a minute and is free for public repos.)*
+
+### Option B — Download and run it yourself (no Git needed)
+
+1. Go to **https://github.com/dantongyu/Claude-Apps**
+2. Click the green **Code** button → **Download ZIP**
+3. Unzip it — you'll get a folder called `Claude-Apps-main`
+4. Open a terminal in that folder and start a small web server:
+
+   **macOS / Linux** (Python is already installed):
+   ```bash
+   cd path/to/Claude-Apps-main
+   python3 -m http.server 8123
+   ```
+
+   **Windows** (Python from [python.org](https://www.python.org/downloads/)):
+   ```bash
+   cd path\to\Claude-Apps-main
+   py -m http.server 8123
+   ```
+
+5. Open **http://127.0.0.1:8123/** in your browser
+
+Leave the terminal window open while you play — closing it stops the server.
+
+> **Why can't I just double-click `index.html`?**
+> Browsers block pages opened straight from your hard drive from loading their own
+> code files, for security reasons. The page will come up blank. It has to be
+> *served*, which is all the command above does. Nothing gets installed and nothing
+> is sent anywhere — the server runs on your own machine and is only reachable
+> from it.
+
+**No terminal at all?** If you use VS Code, install the **Live Server** extension,
+right-click `index.html`, and choose *Open with Live Server*. Same result.
+
+### Option C — Clone it (for developers)
 
 ```bash
+git clone https://github.com/dantongyu/Claude-Apps.git
 cd Claude-Apps
 python3 -m http.server 8123
 ```
 
-**Windows:**
+Everything is committed, including three.js — there is no `npm install`, no build
+step, and no dependencies to fetch.
 
-```bash
-cd Claude-Apps
-py -m http.server 8123
-```
+---
 
-Then open **http://127.0.0.1:8123/** in Chrome, Firefox, Edge, or Safari.
-
-Leave the terminal window open while you play — closing it stops the server.
-
-### Getting into a match
+## 2. Your first match
 
 1. Click **DEPLOY** on the lobby screen
 2. Choose a mission — start with **Cold Open**
@@ -42,7 +81,7 @@ the game waits for it. Press `Esc` any time to release the mouse and pause.
 
 ---
 
-## 2. Controls
+## 3. Controls
 
 | Key | Action |
 |---|---|
@@ -65,7 +104,7 @@ Mouse sensitivity, field of view, and inverted look are all in the pause menu
 
 ---
 
-## 3. Reading your screen
+## 4. Reading your screen
 
 | Where | What it tells you |
 |---|---|
@@ -81,7 +120,7 @@ good it is before you walk over.
 
 ---
 
-## 4. The core loop
+## 5. The core loop
 
 ### You carry 5 items in
 
@@ -116,7 +155,7 @@ Spend credits in the **SHOP**, level up to unlock harder missions.
 
 ---
 
-## 5. Weapons and rarity
+## 6. Weapons and rarity
 
 Every weapon comes in five rarities. **The same gun gets dramatically better as the
 rarity goes up:**
@@ -165,7 +204,7 @@ barely scratches; a sniper stays lethal to 140.
 
 ---
 
-## 6. Staying alive
+## 7. Staying alive
 
 You have **100 health**. Shield stacks on top of it up to another 100, and always
 takes damage first — think of it as a second health bar you have to buy.
@@ -182,7 +221,7 @@ runs. Break line of sight before you start.
 
 ---
 
-## 7. Who you're fighting
+## 8. Who you're fighting
 
 | Enemy | Health | Behaviour |
 |---|---|---|
@@ -196,7 +235,7 @@ completely — use them.
 
 ---
 
-## 8. The missions
+## 9. The missions
 
 | Mission | Unlocks at | Objective | Reward |
 |---|---|---|---|
@@ -214,7 +253,7 @@ Each mission always generates the same map, so you can learn the layout.
 
 ---
 
-## 9. Between missions
+## 10. Between missions
 
 **LOADOUT** — Your stash holds up to 40 items. Equip 5 to take in. Every weapon
 shows its full stats, so you can compare before you commit. Selling returns 40% of
@@ -228,7 +267,7 @@ common way to lose one.
 
 ---
 
-## 10. Tips for your first few runs
+## 11. Tips for your first few runs
 
 - **Run Cold Open twice** before anything else. The first run teaches the controls,
   the second builds your stash.
@@ -244,10 +283,11 @@ common way to lose one.
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 **Nothing loads / the page is blank**
-You're probably opening the file directly. It must be served — see step 1.
+You opened `index.html` directly instead of serving it. See Option B in section 1
+— or just use the online link in Option A.
 
 **The mouse won't lock**
 Click the **DROP IN** button rather than the background. Some browsers block
@@ -265,6 +305,26 @@ per-account.
 **I want to start over**
 Open your browser's developer console (`F12`) and run:
 `localStorage.removeItem('dropzone.save.v1')` — then reload.
+
+---
+
+## Publishing the game (for the repo owner)
+
+Your repo is public and the game is plain static files, so **GitHub Pages will host
+it for free** — then sharing is just a link, and nobody needs Python or a terminal.
+
+1. Go to your repo on GitHub → **Settings** → **Pages** (left sidebar)
+2. Under **Source**, choose **Deploy from a branch**
+3. Set the branch to **`main`** and the folder to **`/ (root)`**
+4. Click **Save**
+
+Wait about a minute, then your game is live at:
+
+**https://dantongyu.github.io/Claude-Apps/**
+
+Every push to `main` republishes it automatically. Once it's up, point people at
+that link instead of the repo — Option A above becomes the only instruction most
+of them need.
 
 ---
 

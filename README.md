@@ -1,25 +1,66 @@
 # Dropzone
 
-A browser-based first-person looter-shooter: lobby → mission → firefight → loot →
-extract → shop, with progress that persists across reloads.
+A browser-based first-person looter-shooter: drop into a mission, fight through AI
+squads, loot chests — and get out, because **anything you find is lost if you go
+down.** Lobby, loadout, missions, and a daily shop, with progress that persists
+across reloads.
 
-No build step, no package manager, no engine install. It is plain ES modules with
-three.js vendored into the repo, so it runs off any static server.
+No install, no account, no build step. Plain ES modules with three.js vendored into
+the repo, so it runs off any static web server.
 
-> **Playing rather than building? Start with [HOW_TO_PLAY.md](HOW_TO_PLAY.md)** — the
-> full player's guide: setup, controls, the weapon and rarity tables, enemies,
-> missions, and troubleshooting. The rest of this file is for developers.
+## Install and play
 
-## Play
+**Three ways in — pick the first one that applies to you.**
+
+### 1. Play online — nothing to install
+
+**https://dantongyu.github.io/Claude-Apps/**
+
+Click and play in any modern browser.
+
+*(If that link 404s, GitHub Pages hasn't been switched on yet — see
+[Publishing the game](HOW_TO_PLAY.md#publishing-the-game-for-the-repo-owner). It's
+a one-minute, one-time setting and free for public repos.)*
+
+### 2. Download and run it locally — no Git needed
+
+1. Click the green **Code** button above → **Download ZIP**, then unzip it
+2. Open a terminal in that folder and start a small local server:
+
+   ```bash
+   python3 -m http.server 8123     # Windows: py -m http.server 8123
+   ```
+
+3. Open **http://127.0.0.1:8123/**
+
+> Double-clicking `index.html` will show a blank page — browsers block pages opened
+> straight from disk from loading their own code files. The command above just
+> serves the folder locally; nothing is installed and nothing leaves your machine.
+
+No terminal? In VS Code, install the **Live Server** extension, right-click
+`index.html`, and pick *Open with Live Server*.
+
+### 3. Clone it — for developers
 
 ```bash
+git clone https://github.com/dantongyu/Claude-Apps.git
+cd Claude-Apps
 python3 -m http.server 8123
-# then open http://127.0.0.1:8123/
 ```
 
-Click **DEPLOY**, pick a mission, then **DROP IN** to capture the mouse.
+There is no `npm install` and no build step. Everything, three.js included, is
+committed.
 
-### Controls
+### Then
+
+Click **DEPLOY** → pick **Cold Open** → click **DROP IN** to capture your mouse.
+`Esc` pauses and gives the mouse back.
+
+> **📖 New players: read [HOW_TO_PLAY.md](HOW_TO_PLAY.md)** — the full guide, with
+> controls, the rarity and weapon tables, enemy types, missions, and
+> troubleshooting. The rest of this file is developer documentation.
+
+## Controls
 
 | | |
 |---|---|
