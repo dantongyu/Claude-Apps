@@ -14,6 +14,7 @@ build step, no lint config. three.js (and PeerJS) are committed under `vendor/`.
 ```bash
 python3 -m http.server 8123      # serve, then open http://127.0.0.1:8123/
 python3 tests/run.py             # run all three test suites (logic, net, physics)
+tests/coop_live.py               # live two-window co-op test (needs playwright; see its docstring)
 ```
 
 The game must be *served*; opening `index.html` from disk gives a blank page (ES
@@ -88,8 +89,9 @@ client, bots become puppets via `Enemy.applyRemote()`, and teammates are
 `RemotePlayer` bodies. Without `net`, single-player must stay byte-identical in
 behaviour. Wire format in `src/net/Protocol.js`; design, invariants and the live
 test checklist in `MULTIPLAYER_PLAN.md`. Headless tests cover `Protocol`,
-`Interpolator` and `Roster`; the session and sync layers can only be tested live
-in two browsers.
+`Interpolator` and `Roster`; `tests/coop_live.py` drives host + joiner through a
+real mission in headless Chromium (48 checks) and is the regression test for the
+session and sync layers. Run it after any change under `src/net/`.
 
 ## Docs to keep in sync
 

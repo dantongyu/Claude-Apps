@@ -14,10 +14,11 @@ export class Emitter {
     this._handlers.get(event)?.delete(fn);
   }
 
-  emit(event, payload) {
+  // Extra arguments are forwarded (NetSession passes the sender's peer id).
+  emit(event, payload, ...rest) {
     const set = this._handlers.get(event);
     if (!set) return;
-    for (const fn of [...set]) fn(payload);
+    for (const fn of [...set]) fn(payload, ...rest);
   }
 
   clear() {

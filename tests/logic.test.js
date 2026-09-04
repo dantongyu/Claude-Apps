@@ -306,6 +306,19 @@ test('objective view reports progress for the HUD', () => {
 
 // ---------------------------------------------------------------- runner
 
+// ---------------------------------------------------------------- emitter
+
+test('emitter forwards extra arguments and unsubscribes', () => {
+  const em = new Emitter();
+  const seen = [];
+  const off = em.on('x', (a, b) => seen.push([a, b]));
+  em.emit('x', 1, 'peer-7');
+  off();
+  em.emit('x', 2, 'peer-8');
+  eq(seen.length, 1, 'handler removed by the returned unsubscribe');
+  eq(seen[0][1], 'peer-7', 'second argument reaches the handler');
+});
+
 let pass = 0;
 const failures = [];
 for (const [name, fn] of T) {

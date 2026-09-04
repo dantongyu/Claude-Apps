@@ -2,8 +2,9 @@
 
 **Status:** built end to end (September 2026): session, room screen, remote
 bodies, host/client split, shared chests, loot and objectives, results. Headless
-tests are green; **live testing across two machines is the outstanding step** —
-see "Testing this" at the end. Single-player is unchanged: `Match` without a
+tests are green, and `tests/coop_live.py` passes a host + joiner through a full
+mission in two browser windows (48 checks). **Two machines on different networks
+is the outstanding step** — see "Testing this" at the end. Single-player is unchanged: `Match` without a
 `net` option takes exactly the paths it always did.
 
 This document exists so whoever picks this up does not have to re-derive the
@@ -185,10 +186,11 @@ The pure logic (`Protocol`, `Interpolator`, `Roster`, and any new pure helpers)
 is testable headlessly — add to `tests/net.test.js` and keep
 `python3 tests/run.py` green.
 
-**The netcode itself can only be tested live**, with two browser windows on the same
-machine to start, and then two different machines on different networks — which is
-the only way NAT traversal problems show up. Expect to spend real time here; this is
-the part that cannot be desk-checked.
+**The netcode itself can only be tested live.** `tests/coop_live.py` does the
+two-windows-on-one-machine stage automatically (headless Chromium via Playwright;
+setup in its docstring) and should stay green. Two different machines on
+different networks is still a manual step — it is the only way NAT traversal
+problems show up.
 
 Watch for:
 - Two players opening one chest simultaneously

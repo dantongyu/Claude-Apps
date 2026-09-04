@@ -155,9 +155,11 @@ JavaScriptCore via `osascript` on macOS, or SpiderMonkey via `gjs` on a Linux
 desktop. If you install node, the same test files port to Vitest with only the
 runner replaced.
 
-The netcode itself cannot be desk-checked: open two browser windows on the same
-machine first, then two machines on different networks (the only way NAT
-problems show up). The checklist is at the end of `MULTIPLAYER_PLAN.md`.
+The netcode is exercised by `tests/coop_live.py`, which drives a host and a
+joiner through a whole mission in headless Chromium (Playwright; setup in its
+docstring). Two machines on different networks remains a manual check, since it
+is the only way NAT problems show up. The checklist is at the end of
+`MULTIPLAYER_PLAN.md`.
 
 ## Not implemented
 
