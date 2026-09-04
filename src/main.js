@@ -12,7 +12,13 @@ import { renderInventory } from './ui/screens/InventoryScreen.js';
 import { renderShop } from './ui/screens/ShopScreen.js';
 import { renderResults } from './ui/screens/Results.js';
 import { renderPause } from './ui/screens/PauseMenu.js';
+import { renderMultiplayer } from './ui/screens/MultiplayerScreen.js';
 import { h } from './ui/dom.js';
+import { NetSession } from './net/NetSession.js';
+import { MSG, EVT } from './net/Protocol.js';
+import { missionById } from './data/missions.js';
+import { activeSkinColor } from './economy/Shop.js';
+import { setUidPrefix } from './inventory/Item.js';
 
 // Top-level controller: owns the renderer, the profile, the state machine and
 // whichever match is currently running.
@@ -41,6 +47,12 @@ class App {
     this.match = null;
     this.result = null;
     this.pauseFirst = false;
+
+    // Co-op session, or null. Lives across matches; dropped on return to the lobby.
+    this.net = null;
+    this.netBusy = false;
+    this.netError = null;
+    this._netUnsubs = [];
 
     this.loop = new Loop();
     this.loop.update = (dt) => this.match?.update(dt);
@@ -111,6 +123,7 @@ class App {
     this.profile.stats.missions++;
     this.save();
 
+    this.net?.setInMatch(true);
     this.match = new Match({
       renderer: this.renderer,
       mission,
@@ -119,6 +132,7 @@ class App {
       hudRoot: this.hudRoot,
       input: this.input,
       onFinish: (result) => this._finishMatch(result),
+      net: this.net,
     });
     this.match.setPaused(true);
     this.pauseFirst = true;
@@ -133,6 +147,76 @@ class App {
 
   abandonMatch() {
     this.match?.finish(false);
+  }
+
+  // --- co-op session ---------------------------------------------------------
+
+  async hostSession() {
+    await this._connect(() => NetSession.host(this.profile.callsign, activeSkinColor(this.profile)));
+  }
+
+  async joinSession(code) {
+    await this._connect(() => NetSession.join(code, this.profile.callsign, activeSkinColor(this.profile)));
+  }
+
+  async _connect(open) {
+    if (this.net || this.netBusy) return;
+    this.netBusy = true;
+    this.netError = null;
+    this.rerender();
+    try {
+      this._attachNet(await open());
+    } catch (err) {
+      this.netError = err?.message ?? String(err);
+    } finally {
+      this.netBusy = false;
+      if (this.state.is(State.MULTIPLAYER)) this.rerender();
+    }
+  }
+
+  _attachNet(session) {
+    this.net = session;
+    // Items minted on this machine can never collide with a teammate's.
+    setUidPrefix(session.localId.replace(/[^a-z0-9]/gi, '').slice(-8));
+    const rerender = () => { if (this.state.is(State.MULTIPLAYER)) this.rerender(); };
+    this._netUnsubs = [
+      session.on(EVT.PLAYERS, rerender),
+      session.on(EVT.LEFT, ({ name }) => this.flash(`${name} left the room`)),
+      session.on('error', (err) => this.flash(err.message)),
+      session.on(EVT.HOST_LEFT, () => this._hostLeft()),
+      session.on(MSG.START, (d) => {
+        if (session.isHost || this.state.is(State.MATCH)) return;
+        const mission = missionById(d.mission);
+        if (mission) this.startMission(mission);
+      }),
+    ];
+  }
+
+  // Host only: tell the room, then deploy ourselves.
+  deployCoop(mission) {
+    if (!this.net?.isHost) return;
+    this.net.send(MSG.START, { mission: mission.id });
+    this.startMission(mission);
+  }
+
+  _hostLeft() {
+    this.flash('The host left the session');
+    this._detachNet();
+    if (this.match) this.match.finish(false); // -> results, then the lobby
+    else this.go(State.LOBBY);
+  }
+
+  leaveNet() {
+    const s = this.net;
+    this._detachNet();
+    s?.leave();
+  }
+
+  _detachNet() {
+    for (const u of this._netUnsubs) u();
+    this._netUnsubs = [];
+    this.net = null;
+    this.netError = null;
   }
 
   _finishMatch(result) {
@@ -188,7 +272,12 @@ class App {
     const root = this.uiRoot;
     root.innerHTML = '';
     switch (this.state.current) {
-      case State.LOBBY: this._leaveMatch(); renderLobby(root, this); break;
+      case State.LOBBY: this._leaveMatch(); this.leaveNet(); renderLobby(root, this); break;
+      case State.MULTIPLAYER:
+        this._leaveMatch();
+        this.net?.setInMatch(false); // back in the room: late joiners welcome again
+        renderMultiplayer(root, this);
+        break;
       case State.MISSIONS: this._leaveMatch(); renderMissions(root, this); break;
       case State.INVENTORY: this._leaveMatch(); renderInventory(root, this); break;
       case State.SHOP: this._leaveMatch(); renderShop(root, this); break;

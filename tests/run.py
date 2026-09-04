@@ -3,12 +3,13 @@
 
 No node is assumed on this machine, so each suite is assembled by concatenating
 the relevant modules (with ES module syntax stripped), prepending a small
-environment stub, and evaluating the result with JavaScriptCore via
-`osascript -l JavaScript`.
+environment stub, and evaluating the result with whichever JS engine is around:
+JavaScriptCore via `osascript -l JavaScript` on macOS, or SpiderMonkey via `gjs`
+on a Linux desktop.
 
     python3 tests/run.py
 """
-import pathlib, re, subprocess, sys
+import pathlib, re, shutil, subprocess, sys, tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / 'src'
@@ -102,7 +103,7 @@ SUITES = [
     {
         'name': 'net',
         'prelude': BASE_PRELUDE,
-        'modules': ['net/Protocol.js', 'net/Interpolator.js'],
+        'modules': ['net/Protocol.js', 'net/Interpolator.js', 'net/Roster.js'],
         'test': 'net.test.js',
     },
     {
@@ -127,12 +128,7 @@ def run_suite(suite):
         parts.append(strip_module((SRC / rel).read_text()))
     parts.append("\n// ===== tests =====\n")
     parts.append(strip_module((TESTS / suite['test']).read_text()))
-    parts.append('\nRESULTS.join("\\n");\n')
-
-    proc = subprocess.run(
-        ['osascript', '-l', 'JavaScript', '-e', ''.join(parts)],
-        capture_output=True, text=True,
-    )
+    proc = run_js(''.join(parts))
     out = (proc.stdout or '').strip()
     err = (proc.stderr or '').strip()
 
@@ -142,6 +138,24 @@ def run_suite(suite):
     if err:
         print(err, file=sys.stderr)
     return bool(out) and 'FAIL' not in out and not err
+
+
+# osascript returns the script's final expression; gjs needs an explicit print.
+def run_js(script):
+    if shutil.which('osascript'):
+        return subprocess.run(
+            ['osascript', '-l', 'JavaScript', '-e', script + '\nRESULTS.join("\\n");\n'],
+            capture_output=True, text=True,
+        )
+    if shutil.which('gjs'):
+        with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False) as f:
+            f.write(script + '\nprint(RESULTS.join("\\n"));\n')
+            path = f.name
+        try:
+            return subprocess.run(['gjs', path], capture_output=True, text=True)
+        finally:
+            pathlib.Path(path).unlink(missing_ok=True)
+    sys.exit('no JS engine found: install gjs (Linux) or run on macOS (osascript)')
 
 
 def main():

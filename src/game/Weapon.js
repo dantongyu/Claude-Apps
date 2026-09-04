@@ -29,7 +29,7 @@ function damp(current, target, rate, dt) {
 }
 
 export class Weapon {
-  // ctx: { camera, scene, effects, arena, enemies, player, inventory, onDamage, onKill }
+  // ctx: { camera, scene, effects, arena, enemies, player, inventory, onDamage, onKill, applyHit? }
   constructor(item, ctx) {
     this.item = item;
     this.ctx = ctx;
@@ -301,7 +301,8 @@ export class Weapon {
     if (enemy && enemy.alive) {
       const isHead = hit.object.userData.part === 'head';
       const dmg = computeDamage(this.stats, hit.distance, isHead);
-      const result = enemy.hurt(dmg);
+      // A co-op client reports the hit to the host instead of applying it.
+      const result = this.ctx.applyHit ? this.ctx.applyHit(enemy, dmg, isHead) : enemy.hurt(dmg);
       effects.impact(hit.point, hit.face?.normal ?? null, isHead ? 0xff5a5a : 0xffbf6a);
       this.ctx.onDamage?.({ enemy, damage: result.total, isHead, killed: result.killed, point: hit.point });
       if (result.killed) this.ctx.onKill?.(enemy);

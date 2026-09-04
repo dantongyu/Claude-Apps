@@ -45,8 +45,10 @@ export function renderResults(root, app) {
     h('div', { class: 'loot-label', text: 'Extracted' }),
     lootList,
     h('div', { class: 'menu' },
-      button('CONTINUE', () => app.go(State.LOBBY), 'btn primary'),
-      button('REDEPLOY', () => app.startMission(r.mission)),
+      // A co-op run returns to the room so the squad can go again.
+      button('CONTINUE', () => app.go(app.net ? State.MULTIPLAYER : State.LOBBY), 'btn primary'),
+      !app.net && button('REDEPLOY', () => app.startMission(r.mission)),
+      app.net?.isHost && button('REDEPLOY SQUAD', () => app.deployCoop(r.mission)),
     ),
   ));
 }

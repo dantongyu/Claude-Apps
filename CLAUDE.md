@@ -22,8 +22,9 @@ modules + importmap). Deployed from `main` via GitHub Pages (`.nojekyll` is ther
 
 ### Test runner caveats
 
-- `tests/run.py` needs **macOS `osascript`** (JavaScriptCore). There is no node,
-  osascript, deno or bun on this Linux dev box, so tests cannot be run here; say so
+- `tests/run.py` uses **macOS `osascript`** (JavaScriptCore) or, failing that,
+  **`gjs`** (SpiderMonkey, present on this Linux dev box). There is no node, deno
+  or bun. If neither engine is found the runner exits with a message; say so
   rather than claiming green.
 - Each suite is built by concatenating the modules listed in `SUITES` in
   `tests/run.py` (in dependency order, `import`/`export` stripped) plus the test
@@ -78,12 +79,17 @@ localStorage (`dropzone.save.v1`). New profile fields go in `defaultProfile()`;
 `withDefaults()` backfills them into old saves, and `migrate()` is the seam for a
 `VERSION` bump. Ammo is pooled by type in `profile.ammo` and shared across weapons.
 
-**Multiplayer (in progress):** only the transport layer exists, `src/net/Protocol.js`
-(message types, room codes, quantised pack/unpack) and `src/net/Interpolator.js`.
-Nothing is wired into the game, `vendor/peerjs/peerjs.min.js` is deliberately not
-loaded by `index.html`, and single-player behaviour must stay unchanged when a
-`net` option is eventually added to `Match`. The authority split and build order
-are in `MULTIPLAYER_PLAN.md`.
+**Multiplayer (co-op, peer-to-peer):** `App` owns an optional `NetSession`
+(`app.net`, from `src/net/NetSession.js`, the only file that touches PeerJS).
+`Match` takes `net`; with it, it builds a `CoopSync` (`src/net/CoopSync.js`)
+that installs the host/client split: `match.isAuthority` (single-player or host)
+gates every world-simulation branch, `LootSystem.authority` flips to false on a
+client, bots become puppets via `Enemy.applyRemote()`, and teammates are
+`RemotePlayer` bodies. Without `net`, single-player must stay byte-identical in
+behaviour. Wire format in `src/net/Protocol.js`; design, invariants and the live
+test checklist in `MULTIPLAYER_PLAN.md`. Headless tests cover `Protocol`,
+`Interpolator` and `Roster`; the session and sync layers can only be tested live
+in two browsers.
 
 ## Docs to keep in sync
 

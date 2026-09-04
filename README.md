@@ -3,7 +3,7 @@
 A browser-based first-person looter-shooter: drop into a mission, fight through AI
 squads, loot chests — and get out, because **anything you find is lost if you go
 down.** Lobby, loadout, missions, and a daily shop, with progress that persists
-across reloads.
+across reloads. Play solo, or host a room and drop in with up to three friends.
 
 No install, no account, no build step. Plain ES modules with three.js vendored into
 the repo, so it runs off any static web server.
@@ -105,6 +105,7 @@ src/
   game/        arena generation, physics, player, weapons, bots, loot, objectives
   inventory/   item model, 5-slot backpack, persistent stash + loadout
   economy/     credits, XP curve, daily shop rotation
+  net/         co-op: wire format, interpolation, PeerJS session, host/client sync
   ui/          DOM screens + in-match HUD
   save/        versioned localStorage profile with a migration seam
 ```
@@ -124,27 +125,45 @@ Collision is an explicit AABB list built alongside the arena geometry rather tha
 a physics library — the world is boxes and the actors are boxes, so a ~400 KB
 dependency would buy nothing.
 
+### Co-op
+
+Co-op is peer-to-peer over WebRTC (PeerJS, vendored), so the game still runs off
+any static host. One player hosts and owns the bots, chests, pickups and
+objectives; every player owns their own body, health and inventory, so there is no
+input lag on the thing you feel most. The map is never sent — arenas are seeded,
+so every peer builds the same one. `src/net/NetSession.js` is the only file that
+touches PeerJS; `src/net/CoopSync.js` is the host/client split, driven by `Match`
+when it is given a session. Design, trade-offs and the testing checklist are in
+[MULTIPLAYER_PLAN.md](MULTIPLAYER_PLAN.md).
+
 ## Tests
 
 ```bash
 python3 tests/run.py
 ```
 
-35 tests over the pure-logic layer (damage maths, rarity roll distributions,
+60 tests over the pure-logic layer (damage maths, rarity roll distributions,
 inventory and stash rules, the XP curve, shop determinism, save migration,
-objective gating) and the collision solver (landing, wall blocking, sliding,
-step-up, ceilings, fast-fall tunnelling, line of sight).
+objective gating), the co-op wire format, interpolation and room roster, and the
+collision solver (landing, wall blocking, sliding, step-up, ceilings, fast-fall
+tunnelling, line of sight).
 
-There is no node on the development machine, so the runner concatenates the
+There is no node on the development machines, so the runner concatenates the
 relevant modules, stubs `localStorage` and the four three.js primitives
-`Physics.js` touches, and evaluates the result with JavaScriptCore via
-`osascript`. If you install node, the same test files port to Vitest with only
-the runner replaced.
+`Physics.js` touches, and evaluates the result with whichever engine is present:
+JavaScriptCore via `osascript` on macOS, or SpiderMonkey via `gjs` on a Linux
+desktop. If you install node, the same test files port to Vitest with only the
+runner replaced.
+
+The netcode itself cannot be desk-checked: open two browser windows on the same
+machine first, then two machines on different networks (the only way NAT
+problems show up). The checklist is at the end of `MULTIPLAYER_PLAN.md`.
 
 ## Not implemented
 
-Building, the shrinking storm, and multiplayer are deliberately out of scope.
-Missions are single-player against AI bots.
+Building, the shrinking storm, PvP and host migration are deliberately out of
+scope. Missions are co-op against AI bots; there is no anti-cheat, because this
+is a game you play with friends over a shared link.
 
 Original work — not affiliated with, and using no assets from, any existing game.
 All geometry is generated at runtime from primitives.

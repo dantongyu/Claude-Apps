@@ -12,6 +12,7 @@ export function defaultProfile() {
   return {
     version: VERSION,
     createdAt: Date.now(),
+    callsign: 'Operator', // shown to co-op teammates
     level: 1,
     xp: 0,
     credits: 500,

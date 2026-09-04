@@ -10,6 +10,7 @@ export class Enemy {
   constructor(archetype, spawnPos, ctx) {
     this.def = archetype;
     this.ctx = ctx; // { scene, colliders, arenaHalf, player, onPlayerDamaged }
+    this.id = 0; // assigned by the match; the co-op wire format keys bots on it
     this.scale = archetype.scale ?? 1;
     this.height = 1.8 * this.scale;
 
@@ -96,17 +97,59 @@ export class Enemy {
   hurt(amount) {
     if (!this.alive) return { total: 0, killed: false };
     const res = applyDamage(this, amount);
-    this.hitFlash = 0.12;
-    this.barGroup.visible = true;
+    this.flash();
     if (this.health <= 0) {
-      this.alive = false;
-      this.deathTime = 0;
-      this.barGroup.visible = false;
-      for (const m of this.hitMeshes) m.userData.enemyRef = null;
+      this._die();
     } else if (this.state === 'idle' || this.state === 'patrol') {
       this.state = 'chase'; // being shot at is an excellent reason to move
     }
     return res;
+  }
+
+  // Hit feedback without touching health: a co-op client shows this while the
+  // host decides what the shot actually did.
+  flash() {
+    this.hitFlash = 0.12;
+    this.barGroup.visible = true;
+  }
+
+  _die() {
+    this.alive = false;
+    this.deathTime = 0;
+    this.barGroup.visible = false;
+    for (const m of this.hitMeshes) m.userData.enemyRef = null;
+  }
+
+  // Co-op client: this bot is a puppet of the host's snapshot. No AI, no
+  // physics; just pose, vitals and the death animation.
+  applyRemote(s, dt) {
+    this.pos.set(s.pos.x, s.pos.y, s.pos.z);
+    this.health = s.health;
+    this.shield = s.shield;
+    if (this.alive && !s.alive) this._die();
+    if (!this.alive) { this._tickDeath(dt); return; }
+    this.group.rotation.y = s.yaw;
+    this.group.position.copy(this.pos);
+    this._tickVisuals(dt);
+  }
+
+  _tickDeath(dt) {
+    this.deathTime += dt;
+    // Topple and sink, then the match reaps us.
+    const t = Math.min(1, this.deathTime / 0.8);
+    this.group.rotation.x = -t * Math.PI * 0.5;
+    this.group.position.y = this.pos.y - t * 0.5;
+  }
+
+  _tickVisuals(dt) {
+    this.hitFlash = Math.max(0, this.hitFlash - dt);
+    this.bodyMat.emissive?.setHex(this.hitFlash > 0 ? 0x661111 : 0x000000);
+    if (this.barGroup.visible) {
+      const frac = (this.health + this.shield) / (this.maxHealth + this.maxShield);
+      this.barFg.scale.x = Math.max(0.001, frac);
+      this.barFg.position.x = -(1 - frac) / 2;
+      this.barGroup.lookAt(this.ctx.player.camera.position); // billboard toward the player
+    }
   }
 
   _setState(next) {
@@ -115,19 +158,15 @@ export class Enemy {
     this.stateTime = 0;
   }
 
-  update(dt, playerPos, playerAlive) {
+  // `targetId` identifies which player `playerPos` belongs to; the match uses it
+  // to route damage in co-op. Single-player passes nothing.
+  update(dt, playerPos, playerAlive, targetId = null) {
     if (!this.alive) {
-      this.deathTime += dt;
-      // Topple and sink, then the match reaps us.
-      const t = Math.min(1, this.deathTime / 0.8);
-      this.group.rotation.x = -t * Math.PI * 0.5;
-      this.group.position.y = this.pos.y - t * 0.5;
+      this._tickDeath(dt);
       return;
     }
 
     this.stateTime += dt;
-    this.hitFlash = Math.max(0, this.hitFlash - dt);
-    this.bodyMat.emissive?.setHex(this.hitFlash > 0 ? 0x661111 : 0x000000);
 
     const eye = this.eyePos;
     const target = playerPos.clone().setY(playerPos.y + 1.4);
@@ -202,18 +241,13 @@ export class Enemy {
     this.fireTimer -= dt;
     if (sees && dist <= this.def.range && this.fireTimer <= 0) {
       this.fireTimer = 1 / this.def.fireRate;
-      this._shoot(playerPos, dist);
+      this._shoot(playerPos, dist, targetId);
     }
 
-    if (this.barGroup.visible) {
-      const frac = (this.health + this.shield) / (this.maxHealth + this.maxShield);
-      this.barFg.scale.x = Math.max(0.001, frac);
-      this.barFg.position.x = -(1 - frac) / 2;
-      this.barGroup.lookAt(this.ctx.player.camera.position); // billboard toward the player
-    }
+    this._tickVisuals(dt);
   }
 
-  _shoot(playerPos, dist) {
+  _shoot(playerPos, dist, targetId) {
     const hits = Math.random() < this.def.accuracy;
     const muzzle = this.eyePos;
     const aim = playerPos.clone().setY(playerPos.y + 1.2);
@@ -226,7 +260,7 @@ export class Enemy {
     if (!hits) return;
     // Bots fall off over distance too, so long-range plinking is survivable.
     const falloff = dist > this.def.range * 0.6 ? 0.7 : 1;
-    this.ctx.onPlayerDamaged?.(this.def.damage * falloff, this.pos);
+    this.ctx.onPlayerDamaged?.(this.def.damage * falloff, this.pos, targetId);
   }
 
   dispose() {

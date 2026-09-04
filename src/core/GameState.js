@@ -7,6 +7,7 @@ export const State = {
   SHOP: 'SHOP',
   MATCH: 'MATCH',
   RESULTS: 'RESULTS',
+  MULTIPLAYER: 'MULTIPLAYER',
 };
 
 // Owns the current screen. UI and the render loop subscribe to `change`.

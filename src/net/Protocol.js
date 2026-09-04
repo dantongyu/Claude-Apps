@@ -23,6 +23,18 @@ export const MSG = {
   PLAYER_DOWN: 'pd', // client -> host: I went down
   MISSION_END: 'me', // host -> all: mission over
   BYE: 'b',          // either way: leaving
+  PING: 'pg',        // either way: heartbeat
+  KILL: 'k',         // host -> all: this player eliminated this bot
+  LOOT_DROP: 'ld',   // client -> host: I dropped this item here
+  MATCH_LEAVE: 'ml', // client -> host: I left the match (session stays up)
+};
+
+export const MAX_PLAYERS = 4;
+// Session-level events raised by NetSession alongside the wire messages above.
+export const EVT = {
+  PLAYERS: 'players',     // the player list changed
+  LEFT: 'left',           // a peer left or timed out ({ id, name })
+  HOST_LEFT: 'host-left', // client only: the host is gone
 };
 
 // Unambiguous alphabet: no O/0, I/1, or S/5, so codes survive being read aloud.
@@ -71,6 +83,14 @@ export function cleanName(name, fallback = 'Operator') {
 
 const q2 = (n) => Math.round(n * 100) / 100;
 const q3 = (n) => Math.round(n * 1000) / 1000;
+
+export function packPos(v) {
+  return [q2(v.x), q2(v.y), q2(v.z)];
+}
+
+export function unpackPos(a) {
+  return { x: a[0], y: a[1], z: a[2] };
+}
 
 export function packPlayer(p) {
   return {

@@ -1,7 +1,10 @@
 # Co-op Multiplayer — Design and Handoff
 
-**Status:** transport layer written and tested; nothing is wired into the game yet.
-Single-player is untouched and still works exactly as before.
+**Status:** built end to end (September 2026): session, room screen, remote
+bodies, host/client split, shared chests, loot and objectives, results. Headless
+tests are green; **live testing across two machines is the outstanding step** —
+see "Testing this" at the end. Single-player is unchanged: `Match` without a
+`net` option takes exactly the paths it always did.
 
 This document exists so whoever picks this up does not have to re-derive the
 decisions. Read it before writing code.
@@ -57,23 +60,49 @@ consumes its RNG at different rates once play begins.
 
 ---
 
-## What is already built
+## What is built
 
 | File | What it does | Tested |
 |---|---|---|
-| `src/net/Protocol.js` | Message types, room codes, and pack/unpack for players, bots and snapshots. Positions quantised to 1cm and angles to ~0.06°, which roughly halves snapshot size. | 10 tests |
+| `src/net/Protocol.js` | Message types, room codes, and pack/unpack for players, bots, positions and snapshots. Positions quantised to 1cm and angles to ~0.06°, which roughly halves snapshot size. | 11 tests |
 | `src/net/Interpolator.js` | Snapshot buffer. Renders remote entities 120ms in the past and blends between the two bracketing snapshots, so 15Hz updates look smooth at 60fps. Handles angle wrap and out-of-order arrivals. | 8 tests |
-| `vendor/peerjs/peerjs.min.js` | PeerJS 1.5.4, committed like three.js so there is still no install step. Exposes `window.Peer`. | — |
-| `tests/net.test.js` | The 18 tests above. Run with `python3 tests/run.py`. | — |
+| `src/net/Roster.js` | The host's player registry: join/refuse rules (full, locked mid-mission, duplicate), name de-duplication, colour validation, heartbeat timeouts. | 6 tests |
+| `src/net/NetSession.js` | The only file that touches PeerJS. `host()` / `join()`, HELLO/WELCOME handshake with a protocol-version check, 2s heartbeat with an 8s drop, `send`/`sendTo`/`on`. Raises `EVT.PLAYERS`, `EVT.LEFT`, `EVT.HOST_LEFT`. | live only |
+| `src/net/CoopSync.js` | The host/client split inside a match. Host: owns bots, chests, pickups, objectives, broadcasts 15Hz snapshots, validates hits, routes bot damage to the right player. Client: sends its state at 15Hz, puppets bots and teammates from the interpolator, requests loot and chests. | live only |
+| `src/game/RemotePlayer.js` | A teammate's body: tinted box figure, aim-pitched gun, canvas name tag. Driven only by `apply(state)`. | live only |
+| `src/ui/screens/MultiplayerScreen.js` | HOST / JOIN, the room code, player list, and the host-only mission picker. `State.MULTIPLAYER`. | — |
+| `vendor/peerjs/peerjs.min.js` | PeerJS 1.5.4, committed like three.js so there is still no install step. Loaded by `index.html` as a classic script; exposes `window.Peer`. | — |
+| `tests/net.test.js` | The 25 tests above. Run with `python3 tests/run.py`. | — |
 
 A full 4-player, 8-bot snapshot serialises to **under 1400 bytes**, so ~15Hz is
 comfortable.
 
+### How the pieces hang together
+
+- `App` (`main.js`) owns the session (`app.net`) across matches. Entering the
+  LOBBY drops it; RESULTS returns a co-op run to the room instead. The host
+  sends `START` then deploys; clients deploy on receiving it.
+- `Match` takes `net`; with it, it builds a `CoopSync` before the first weapon
+  (the weapon context needs the client hit hook). `match.isAuthority` is true
+  for single-player and the host; every world-simulation branch checks it.
+- `LootSystem.authority` flips to false on a client; `loot.remote` is the hook
+  bundle `CoopSync` installs (`spawn`/`claimed` on the host, `take`/`drop`/
+  `openChest` on a client). Chests are addressed by index into the seeded chest
+  spots; pickups by a host-assigned id.
+- `Enemy` gained `id`, `applyRemote()` (puppet mode), `flash()` and a `targetId`
+  on `update()` so bot fire is routed to whichever player it was aimed at.
+- Going down in co-op means spectating from where you fell (free look). The
+  mission ends when the host's objectives complete, or when nobody is left
+  standing. A downed player's own result is always a failure: mission loot lost,
+  partial credits, exactly like single-player.
+- The host pausing does **not** freeze the world in co-op (its bots are
+  everyone's bots); a client pausing just stops their own input.
+
 ---
 
-## What is left to build
+## Original build order (kept for reference)
 
-Ordered so each step is verifiable before the next.
+Each step was verifiable before the next.
 
 ### 1. `src/net/NetSession.js` — the only file that touches PeerJS
 
@@ -152,8 +181,9 @@ should need no changes.
 
 ## Testing this
 
-The pure logic (`Protocol`, `Interpolator`, and any new pure helpers) is testable
-headlessly — add to `tests/net.test.js` and keep `python3 tests/run.py` green.
+The pure logic (`Protocol`, `Interpolator`, `Roster`, and any new pure helpers)
+is testable headlessly — add to `tests/net.test.js` and keep
+`python3 tests/run.py` green.
 
 **The netcode itself can only be tested live**, with two browser windows on the same
 machine to start, and then two different machines on different networks — which is

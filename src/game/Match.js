@@ -15,14 +15,19 @@ import { ScopeOverlay } from './ScopeOverlay.js';
 import { ViewmodelLayer } from './ViewmodelLayer.js';
 import { weaponEnvironment } from './Environment.js';
 import { setWeaponEnvironment } from './WeaponModel.js';
+import { CoopSync } from '../net/CoopSync.js';
 
 const RESPAWN_DELAY = 2.2;
 const EXTRACT_RADIUS = 3.4;
 
 // One playable mission. Owns its scene graph entirely and tears all of it down
 // in dispose(), so lobby -> match -> lobby can repeat without leaking.
+//
+// `net` is an optional NetSession. With it, the match is one seat in a co-op
+// run and defers to CoopSync for who owns what; without it, everything below
+// behaves exactly as single-player always has.
 export class Match {
-  constructor({ renderer, mission, profile, loadout, hudRoot, input, onFinish }) {
+  constructor({ renderer, mission, profile, loadout, hudRoot, input, onFinish, net = null }) {
     this.renderer = renderer;
     this.mission = mission;
     this.profile = profile;
@@ -64,10 +69,11 @@ export class Match {
     this.loot = new LootSystem(this.scene, this.rng, luck, this.inventory, {
       onPickup: (text, color) => this.hud.toast(text, color),
       onBlocked: (text) => this.hud.toast(text, '#ff6a6a'),
-      onChestOpened: () => {
-        this.stats.chests++;
+      onChestOpened: (chest, byId) => {
+        if (byId == null) this.stats.chests++;
         this.objectives.onChestOpened();
-        this.hud.toast('Chest opened', '#d8b04a');
+        this.hud.toast(byId == null ? 'Chest opened' : `${this.coop.playerName(byId)} opened a chest`, '#d8b04a');
+        this.coop?.announceChest(chest.index, byId);
       },
     });
     this.loot.spawnChests(this.arena.chestSpots);
@@ -77,6 +83,7 @@ export class Match {
     this.objectives.on('objective', (o) => this.hud.toast(`Objective: ${o.label}`, '#4fd66f'));
 
     this.enemies = [];
+    this.nextEnemyId = 1;
     this.spawnedCount = 0;
     this.spawnTimer = 1.5;
     this.stats = { kills: 0, chests: 0, headshots: 0, damage: 0, time: 0 };
@@ -87,9 +94,18 @@ export class Match {
     this.deathTimer = 0;
     this.paused = false;
 
+    // Must exist before the first weapon: the weapon context asks it for the
+    // hit hook. It also flips the loot system to client mode when needed.
+    this.coop = net ? new CoopSync(this, net) : null;
+
     this._equipFirstWeapon();
     this.hud.setBanner(mission.name, mission.brief);
     this.hud.objectiveList(this.objectives.view());
+  }
+
+  // True when this match simulates the world: single-player, or the co-op host.
+  get isAuthority() {
+    return !this.coop || this.coop.isHost;
   }
 
   // --- weapons ---------------------------------------------------------------
@@ -106,6 +122,20 @@ export class Match {
       inventory: this.inventory,
       onDamage: (info) => this._onEnemyDamaged(info),
       onKill: (enemy) => this._onEnemyKilled(enemy),
+      applyHit: this.coop?.isClient
+        ? (enemy, dmg, isHead) => this.coop.clientHit(enemy, dmg, isHead)
+        : null,
+    };
+  }
+
+  _enemyCtx() {
+    return {
+      scene: this.scene,
+      colliders: this.arena.colliders,
+      arenaHalf: this.arena.half,
+      player: this.player,
+      effects: this.effects,
+      onPlayerDamaged: (dmg, from, targetId) => this._onPlayerDamaged(dmg, from, targetId),
     };
   }
 
@@ -143,20 +173,51 @@ export class Match {
     }
   }
 
-  _onEnemyKilled(enemy) {
-    this.stats.kills++;
+  // `byId` is the co-op peer who landed the killing shot (null = us). Only the
+  // authority ever gets here; clients hear about kills via _onKillAnnounced.
+  _onEnemyKilled(enemy, byId = null) {
+    if (byId == null) this.stats.kills++;
     this.objectives.onKill();
     this.loot.dropFromEnemy(enemy.pos);
-    this.hud.kill(`Eliminated ${enemy.def.name}`);
+    this.hud.kill(byId == null
+      ? `Eliminated ${enemy.def.name}`
+      : `${this.coop.playerName(byId)} eliminated ${enemy.def.name}`);
+    this.coop?.announceKill(enemy, byId);
   }
 
-  _onPlayerDamaged(amount, fromPos) {
+  // Co-op client: the host confirmed a kill.
+  _onKillAnnounced(byId, enemyName) {
+    if (byId === this.coop.localId) {
+      this.stats.kills++;
+      this.hud.kill(`Eliminated ${enemyName}`);
+    } else {
+      this.hud.kill(`${this.coop.playerName(byId)} eliminated ${enemyName}`);
+    }
+  }
+
+  // Co-op client: the host confirmed a chest opened.
+  _onChestOpenedRemote(byId) {
+    if (byId === this.coop.localId) {
+      this.stats.chests++;
+      this.hud.toast('Chest opened', '#d8b04a');
+    } else {
+      this.hud.toast(`${this.coop.playerName(byId)} opened a chest`, '#d8b04a');
+    }
+  }
+
+  // `targetId` names a remote player a bot shot (co-op host only); null is us.
+  _onPlayerDamaged(amount, fromPos, targetId = null) {
+    if (targetId != null) {
+      this.coop?.hurtRemote(targetId, amount, fromPos);
+      return;
+    }
     if (!this.player.alive) return;
     this.player.takeDamage(amount, fromPos);
     this.hud.tookDamage(this.player.damageIndicatorAngle());
     if (!this.player.alive) {
       this.deathTimer = RESPAWN_DELAY;
-      this.hud.setBanner('You went down', 'Mission failed');
+      if (this.coop) this.hud.setBanner('You went down', 'Spectating — your squad is still in the fight');
+      else this.hud.setBanner('You went down', 'Mission failed');
     }
   }
 
@@ -172,21 +233,16 @@ export class Match {
     if (this.spawnTimer > 0) return;
     this.spawnTimer = this.rng.range(1.2, 3.0);
 
-    // Spawn out of the player's immediate view so bots don't pop in on top of them.
+    // Spawn out of everyone's immediate view so bots don't pop in on top of them.
+    const players = this.coop ? this.coop.playerPositions() : [this.player.pos];
     const candidates = this.arena.enemySpawns
-      .filter((s) => s.distanceTo(this.player.pos) > 18);
+      .filter((s) => players.every((p) => s.distanceTo(p) > 18));
     this.rng.shuffle(candidates);
     const spot = candidates[0] ?? this.rng.pick(this.arena.enemySpawns);
 
     const typeId = this.rng.pick(cfg.types);
-    const enemy = new Enemy(ENEMIES[typeId], spot, {
-      scene: this.scene,
-      colliders: this.arena.colliders,
-      arenaHalf: this.arena.half,
-      player: this.player,
-      effects: this.effects,
-      onPlayerDamaged: (dmg, from) => this._onPlayerDamaged(dmg, from),
-    });
+    const enemy = new Enemy(ENEMIES[typeId], spot, this._enemyCtx());
+    enemy.id = this.nextEnemyId++;
     this.enemies.push(enemy);
     this.spawnedCount++;
   }
@@ -280,56 +336,95 @@ export class Match {
   update(dt) {
     if (this.finished) return;
 
-    if (this.paused || !this.input.locked) {
-      // Still drain edge-triggered input so nothing queues up while paused.
+    const active = !this.paused && this.input.locked;
+    if (!active && !this.coop) {
+      // Single-player freezes outright. Still drain edge-triggered input so
+      // nothing queues up while paused.
       this.input.endFrame();
       return;
     }
+    // In co-op the world keeps moving while a menu is open: the host's bots
+    // are everyone's bots, and a client's squad does not wait for them.
 
     this.stats.time += dt;
 
     if (this.player.alive) {
-      // Aiming slows the mouse in proportion to magnification, or an 8x scope
-      // is unusable.
-      const look = this.input.takeMouseDelta();
-      const aim = this.weapon?.aimSensitivity ?? 1;
-      this.player.look(look.x * aim, look.y * aim, this.profile.settings.invertY);
-      this.player.update(dt, this.input);
-      this._handleActions(dt);
-      const ads = this.input.rightDown && !this.useItem;
-      this.weapon?.update(dt, this.input.mouseDown && !this.useItem, ads);
+      if (active) {
+        // Aiming slows the mouse in proportion to magnification, or an 8x scope
+        // is unusable.
+        const look = this.input.takeMouseDelta();
+        const aim = this.weapon?.aimSensitivity ?? 1;
+        this.player.look(look.x * aim, look.y * aim, this.profile.settings.invertY);
+        this.player.update(dt, this.input);
+        this._handleActions(dt);
+        const ads = this.input.rightDown && !this.useItem;
+        this.weapon?.update(dt, this.input.mouseDown && !this.useItem, ads);
+      }
     } else {
       this.deathTimer -= dt;
       this.hud.setPrompt(null);
-      if (this.deathTimer <= 0) {
+      if (this.coop && active) {
+        // Spectate from where you fell: free look, no movement.
+        const look = this.input.takeMouseDelta();
+        this.player.look(look.x, look.y, this.profile.settings.invertY);
+        this.camera.quaternion.setFromEuler(new THREE.Euler(this.player.pitch, this.player.yaw, 0, 'YXZ'));
+      }
+      // Single-player ends here; co-op waits until nobody is left standing
+      // (the host decides), or the host reports the outcome to clients.
+      if (this.deathTimer <= 0 && this.isAuthority && (!this.coop || !this.coop.anyAlive())) {
         this.finish(false);
         this.input.endFrame();
         return;
       }
     }
+    // A kill can complete the mission from inside weapon.update(), which
+    // disposes this match; nothing below may run on a torn-down scene.
+    if (this.finished) return;
 
-    this._spawnTick(dt);
-    for (const e of this.enemies) e.update(dt, this.player.pos, this.player.alive);
+    if (this.isAuthority) {
+      this._spawnTick(dt);
+      for (const e of this.enemies) {
+        if (this.coop) {
+          const t = this.coop.targetFor(e.pos);
+          e.update(dt, t.pos, t.alive, t.id);
+        } else {
+          e.update(dt, this.player.pos, this.player.alive);
+        }
+      }
 
-    // Reap corpses once their topple animation has played out.
-    for (let i = this.enemies.length - 1; i >= 0; i--) {
-      const e = this.enemies[i];
-      if (!e.alive && e.deathTime > 3) {
-        e.dispose();
-        this.enemies.splice(i, 1);
+      // Reap corpses once their topple animation has played out.
+      for (let i = this.enemies.length - 1; i >= 0; i--) {
+        const e = this.enemies[i];
+        if (!e.alive && e.deathTime > 3) {
+          e.dispose();
+          this.enemies.splice(i, 1);
+        }
       }
     }
 
     this.loot.update(dt, this.player.pos);
     this.effects.update(dt);
 
-    const atExtract = this.arena.extractPos.distanceTo(this.player.pos) < EXTRACT_RADIUS;
-    this.objectives.tick(dt, atExtract);
-    // tick() can complete the mission, which disposes this match immediately.
+    if (this.isAuthority) {
+      const atExtract = this.arena.extractPos.distanceTo(this.player.pos) < EXTRACT_RADIUS
+        || !!this.coop?.anyPlayerAt(this.arena.extractPos, EXTRACT_RADIUS);
+      this.objectives.tick(dt, atExtract);
+      // tick() can complete the mission, which disposes this match immediately.
+      if (this.finished) return;
+    }
+
+    // Co-op: send our state / the snapshot, and move remote bodies and puppets.
+    this.coop?.update(dt);
     if (this.finished) return;
+
+    const view = this._objectiveView();
     const pad = this.arena.extractPad;
-    if (this.objectives.extractEntry) {
-      pad.visible = this.objectives.extractUnlocked;
+    const ext = this.objectives.extractEntry;
+    if (ext) {
+      const unlocked = this.isAuthority
+        ? this.objectives.extractUnlocked
+        : !(view[this.objectives.entries.indexOf(ext)]?.locked ?? true);
+      pad.visible = unlocked;
       if (pad.visible) pad.material.opacity = 0.35 + Math.sin(this.stats.time * 3) * 0.2;
     }
 
@@ -337,10 +432,16 @@ export class Match {
     this.hud.ammo(this.weapon);
     this.hud.aimState(this.weapon, this.camera.fov);
     this.hud.hotbarState(this.inventory);
-    this.hud.objectiveList(this.objectives.view());
+    this.hud.objectiveList(view);
     this.hud.update(dt);
 
     this.input.endFrame();
+  }
+
+  // A client shows the host's objective progress; everyone else computes it.
+  _objectiveView() {
+    if (this.isAuthority) return this.objectives.view();
+    return this.coop.objectives ?? this.objectives.view();
   }
 
   render() {
@@ -374,6 +475,8 @@ export class Match {
   finish(success) {
     if (this.finished) return;
     this.finished = true;
+    // Clients learn the outcome from us; a downed client still fails on its own.
+    if (this.coop?.isHost) this.coop.announceEnd(success);
     this.weapon?.syncItem();
 
     const result = {
@@ -388,12 +491,14 @@ export class Match {
       // keep only what you brought in.
       carried: success ? this.inventory.items().map((i) => ({ ...i })) : null,
       ammo: { ...this.inventory.ammo },
-      objectives: this.objectives.view(),
+      objectives: this._objectiveView(),
     };
     this.onFinish?.(result);
   }
 
   dispose() {
+    this.coop?.dispose();
+    this.coop = null;
     this.weapon?.dispose();
     this.weapon = null;
     this.scope?.dispose();

@@ -39,7 +39,10 @@ export function renderPause(root, app) {
       h('div', { class: 'menu' },
         button(app.pauseFirst ? 'DROP IN' : 'RESUME', () => app.resumeMatch(), 'btn primary'),
         button('ABANDON MISSION', () => {
-          if (confirm('Abandon the mission? Anything you found here is lost.')) app.abandonMatch();
+          const msg = app.net?.isHost
+            ? 'Abandon the mission? You are hosting, so it ends for the whole squad.'
+            : 'Abandon the mission? Anything you found here is lost.';
+          if (confirm(msg)) app.abandonMatch();
         }, 'btn ghost'),
       ),
     ),

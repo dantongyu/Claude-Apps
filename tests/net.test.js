@@ -203,6 +203,80 @@ test('the buffer does not grow without bound', () => {
   eq(it.latest.time, 199, 'keeps the newest');
 });
 
+// ---------------------------------------------------------------- positions
+
+test('positions pack to arrays and back', () => {
+  const back = unpackPos(packPos({ x: 1.234, y: -0.006, z: 99.999 }));
+  close(back.x, 1.23, 1e-9);
+  close(back.y, -0.01, 1e-9, 'rounds, does not truncate');
+  close(back.z, 100, 1e-9);
+});
+
+// ---------------------------------------------------------------- roster
+
+const mkRoster = () => {
+  const r = new Roster({ maxPlayers: 3, timeout: 8 });
+  r.add('host', { name: 'Dan', color: '#e4633c', host: true, now: 0 });
+  return r;
+};
+
+test('players join in order and the list is broadcast-safe', () => {
+  const r = mkRoster();
+  ok(r.add('p2', { name: 'Kim', color: '#4f9d5c', now: 1 }).ok);
+  const list = r.list();
+  eq(list.length, 2);
+  eq(list[0].id, 'host'); eq(list[0].host, true);
+  eq(list[1].name, 'Kim'); eq(list[1].host, false);
+  ok(!('lastSeen' in list[1]), 'timestamps stay private');
+});
+
+test('a full room refuses with a readable reason', () => {
+  const r = mkRoster();
+  r.add('p2', { name: 'a' }); r.add('p3', { name: 'b' });
+  const res = r.add('p4', { name: 'c' });
+  eq(res.ok, false);
+  eq(res.reason, 'room is full');
+});
+
+test('nobody joins once the mission has started', () => {
+  const r = mkRoster();
+  r.lock();
+  eq(r.add('p2', { name: 'late' }).reason, 'mission already in progress');
+  r.unlock();
+  ok(r.add('p2', { name: 'late' }).ok, 'open again between missions');
+});
+
+test('duplicate ids and names are handled', () => {
+  const r = mkRoster();
+  eq(r.add('host', { name: 'x' }).reason, 'already in the room');
+  r.add('p2', { name: 'Operator' });
+  r.add('p3', { name: 'Operator' });
+  r.add('p4', { name: '' }); // full: 3 max, so this one is refused
+  const names = r.list().map((p) => p.name);
+  eq(names[1], 'Operator');
+  eq(names[2], 'Operator 2', 'second same-named player gets a suffix');
+});
+
+test('names are cleaned and colours validated on the way in', () => {
+  const r = mkRoster();
+  const { player } = r.add('p2', { name: '   Kim   Lee  ', color: 'javascript:alert(1)' });
+  eq(player.name, 'Kim Lee');
+  eq(player.color, '#5b8dd6', 'bad colour falls back to the default skin');
+});
+
+test('quiet peers go stale after the timeout, the host never does', () => {
+  const r = mkRoster();
+  r.add('p2', { name: 'a', now: 0 });
+  r.add('p3', { name: 'b', now: 0 });
+  r.touch('p3', 7);
+  eq(r.stale(9).join(','), 'p2', 'p2 silent for 9s, p3 for 2s');
+  eq(r.stale(100).sort().join(','), 'p2,p3');
+  ok(!r.stale(100).includes('host'), 'the host is never dropped by its own roster');
+  r.remove('p2');
+  eq(r.size, 2);
+  eq(r.remove('nobody'), null);
+});
+
 let pass = 0;
 const failures = [];
 for (const [name, fn] of T) {

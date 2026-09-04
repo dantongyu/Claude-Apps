@@ -492,3 +492,54 @@ html, body {
   .loadout-strip { grid-template-columns: repeat(2, 1fr); }
   .hotbar { transform: translateX(-50%) scale(0.8); }
 }
+
+/* ---------------------------------------------------------------- co-op */
+
+.coop { max-width: 980px; margin: 0 auto; }
+.coop-body { display: flex; flex-direction: column; gap: 6px; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); max-width: 320px; margin: 6px 0 14px; }
+.text-input {
+  font: inherit; color: var(--text); background: #131920;
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+}
+.text-input:focus { outline: none; border-color: var(--accent); }
+.text-input.code {
+  font-family: var(--mono); font-size: 22px; font-weight: 800; letter-spacing: 0.35em;
+  text-transform: uppercase; width: 150px; text-align: center; padding: 8px 6px 8px 14px;
+}
+.coop-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.coop-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;
+}
+.coop-card h3 { margin: 0; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; }
+.coop-card p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.coop-card .btn { align-self: flex-start; }
+.join-row { display: flex; gap: 10px; align-items: center; }
+
+.room-head { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.room-head .loadout-label { margin-top: 0; }
+.room-code {
+  font-family: var(--mono); font-size: 54px; font-weight: 800; letter-spacing: 0.3em;
+  line-height: 1; padding: 6px 0 6px 6px; user-select: all;
+  background: linear-gradient(92deg, #7fc4ff, #d7a3ff 60%, #ffb03a);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.room-actions { display: flex; gap: 8px; margin-left: auto; padding-bottom: 10px; }
+
+.player-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.player-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; font-size: 13px; font-weight: 600;
+}
+.player-row.me { border-color: rgba(74,169,255,0.55); }
+.player-row.empty { color: var(--muted); font-weight: 400; border-style: dashed; }
+.swatch { width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 -4px 6px rgba(0,0,0,0.35); }
+.player-name { flex: 1; }
+.tag {
+  font-size: 10px; letter-spacing: 0.14em; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--accent-2);
+}
+.tag.you { color: var(--accent); }
+.mission-list.compact { margin-top: 4px; }

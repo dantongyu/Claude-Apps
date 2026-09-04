@@ -59,6 +59,7 @@ export function renderLobby(root, app) {
     loadoutRow,
     h('div', { class: 'menu' },
       button('DEPLOY', () => app.go(State.MISSIONS), 'btn primary'),
+      button('CO-OP', () => app.go(State.MULTIPLAYER)),
       button('LOADOUT', () => app.go(State.INVENTORY)),
       button('SHOP', () => app.go(State.SHOP)),
     ),

@@ -4,7 +4,8 @@ A first-person looter-shooter that runs in your browser. Take a loadout into a
 mission, fight your way through, grab what you can — and get the job done, because
 **if you go down, everything you found stays behind.**
 
-No install, no account. If you can open a web page, you can play.
+No install, no account. If you can open a web page, you can play — alone, or with
+up to three friends in the same mission (section 11).
 
 ---
 
@@ -267,7 +268,110 @@ common way to lose one.
 
 ---
 
-## 11. Tips for your first few runs
+## 11. Playing with friends (co-op)
+
+Up to **4 players** drop into the same mission and fight the bots together.
+Objectives and kills are shared; **loot is per player** — what you pick up is
+yours, and the usual rule applies: go down and you lose it.
+
+It is peer-to-peer. There is no server to run, no account, nothing to install
+beyond what you already did to play solo. One player **hosts** and gets a
+4-letter room code; everyone else **joins** with that code.
+
+### Setting it up so friends can play
+
+Every player just needs the game open in their own browser, on their own
+computer. Three ways to get it in front of them — use the first that fits:
+
+**1. Everyone opens the public link (easiest)**
+
+Send your friends **https://dantongyu.github.io/Claude-Apps/**. That is it.
+Any modern browser on any computer, anywhere in the world. (Repo owner: this
+needs GitHub Pages switched on — see "Publishing the game" at the bottom.)
+
+**2. Your own copy, on GitHub Pages**
+
+If you have forked or changed the game, publish your fork the same way (Settings
+→ Pages → `main` / root). Then send friends *your* Pages link. Everyone must be
+on the **same build** — a host and a joiner running different versions are
+refused with a "version mismatch" message.
+
+**3. Same room or same Wi‑Fi, no internet hosting needed**
+
+Run the local server from Option B in section 1 on one computer:
+
+```bash
+python3 -m http.server 8123
+```
+
+Find that computer's address on the network (macOS: System Settings → Wi‑Fi →
+Details; Windows: `ipconfig`, look for IPv4; Linux: `hostname -I`) — say
+`192.168.1.20`. Friends on the same Wi‑Fi open
+**http://192.168.1.20:8123/** in their browser. You still need internet access
+for the brief moment players connect (the room code is matched through a small
+public directory service), but the game itself then runs directly between your
+machines.
+
+> Downloading the ZIP and double-clicking `index.html` does **not** work for
+> co-op either — the page has to be served, exactly as in section 1.
+
+### Hosting a room
+
+1. In the lobby click **CO-OP**.
+2. Set your **callsign** (the name your squad sees over your head).
+3. Click **HOST A ROOM**. A 4-letter code appears, big — read it out or hit
+   **COPY CODE** and paste it to your friends.
+4. Watch the squad list fill up. When everyone is in, pick a mission and click
+   **DEPLOY SQUAD**. Everyone deploys at once.
+
+Stay on the co-op screen while friends join. If you go back to the lobby the
+room closes and everyone in it is sent home.
+
+### Joining a room
+
+1. Make sure you have a **weapon equipped** in LOADOUT — you cannot deploy
+   without one, and the host will not wait.
+2. Lobby → **CO-OP** → type the code under **JOIN A ROOM** → **JOIN**.
+3. Wait for the host to pick a mission. You are dropped in automatically.
+
+### In the mission
+
+- Teammates show as coloured figures with a name tag (their shop skin colour).
+- Bots, chests and floor loot are run by the host. If two of you reach the same
+  item, whoever the host hears from first gets it — the other sees it vanish.
+- The kill feed names who eliminated what. Only your own kills and chests count
+  toward your credits.
+- **Going down** puts you in spectator mode where you fell: you can look around
+  but not move. The mission continues for the others and ends when the
+  objectives are done or nobody is left standing. Your own result is a wipe
+  either way — mission loot lost, partial pay — exactly as in solo.
+- After the results screen, **CONTINUE** returns the whole squad to the room so
+  the host can go again.
+- Nobody can join a mission already in progress; they wait in the room for the
+  next one.
+
+### Co-op troubleshooting
+
+**"No room with that code"** — Check the code (there are no O/0, I/1 or S/5 in
+codes). The host must still be on the co-op screen: leaving it closes the room.
+
+**"Version mismatch"** — You are on different builds. Everyone should open the
+same link, and reload if it was open in an old tab.
+
+**It connects, then nothing happens / "The host left"** — Some office, school
+and university networks block direct peer connections. Try a phone hotspot for
+whichever player is on the strict network. Home Wi‑Fi almost always works.
+
+**Teammates stutter or teleport** — Normal on a poor connection. Bots and
+teammates are shown a fraction of a second in the past to smooth this over; if
+someone's connection is very bad it will still show.
+
+**The host's Esc menu doesn't pause the bots** — Intended. The host runs the
+world for everyone, so it keeps going while a menu is open.
+
+---
+
+## 12. Tips for your first few runs
 
 - **Run Cold Open twice** before anything else. The first run teaches the controls,
   the second builds your stash.
@@ -283,7 +387,7 @@ common way to lose one.
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 **Nothing loads / the page is blank**
 You opened `index.html` directly instead of serving it. See Option B in section 1
