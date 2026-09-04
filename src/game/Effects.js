@@ -49,6 +49,14 @@ export class Effects {
     this.flash.visible = false;
     this.flash.renderOrder = 999;
     this.flashLife = 0;
+
+    // A real light for the flash: it costs one light for 45ms and is most of
+    // what makes a shot read as a shot indoors. It lives in the world scene
+    // rather than on the flash mesh, because the mesh is drawn by the separate
+    // viewmodel camera and a light parented there would illuminate nothing.
+    this.flashLight = new THREE.PointLight(0xffc266, 0, 10, 2);
+    this.flashLight.visible = false;
+    scene.add(this.flashLight);
   }
 
   attachFlashTo(parent, offset) {
@@ -77,9 +85,12 @@ export class Effects {
     slot.life = 0.22;
   }
 
-  muzzleFlash() {
+  muzzleFlash(scale = 1, worldPosition = null) {
     this.flash.visible = true;
-    this.flash.scale.setScalar(0.8 + Math.random() * 0.6);
+    this.flash.scale.setScalar((0.8 + Math.random() * 0.6) * scale);
+    if (worldPosition) this.flashLight.position.copy(worldPosition);
+    this.flashLight.visible = true;
+    this.flashLight.intensity = 16 * scale;
     this.flashLife = 0.045;
   }
 
@@ -101,7 +112,11 @@ export class Effects {
     }
     if (this.flashLife > 0) {
       this.flashLife -= dt;
-      if (this.flashLife <= 0) this.flash.visible = false;
+      this.flashLight.intensity *= Math.pow(0.0001, dt);
+      if (this.flashLife <= 0) {
+        this.flash.visible = false;
+        this.flashLight.visible = false;
+      }
     }
   }
 
@@ -109,6 +124,7 @@ export class Effects {
     for (const t of this.tracers) this.scene.remove(t.mesh);
     for (const s of this.impacts) this.scene.remove(s.mesh);
     this.flash.removeFromParent();
+    this.flashLight.removeFromParent();
     for (const d of this._disposables) d.dispose?.();
     this.tracers = [];
     this.impacts = [];

@@ -316,17 +316,51 @@ html, body {
 /* ---------------------------------------------------------------- HUD */
 
 .crosshair {
+  --gap: 8px;
   position: absolute; left: 50%; top: 50%; width: 26px; height: 26px;
   transform: translate(-50%, -50%);
+  transition: opacity 0.09s ease-out;
 }
+/* The gap tracks the live spread cone, so bloom while running is visible. */
+.crosshair.hidden { opacity: 0; }
 .crosshair i {
   position: absolute; background: rgba(255,255,255,0.85);
   box-shadow: 0 0 2px rgba(0,0,0,0.9);
 }
-.crosshair i:nth-child(1) { left: 50%; top: 0; width: 2px; height: 8px; margin-left: -1px; }
-.crosshair i:nth-child(2) { left: 50%; bottom: 0; width: 2px; height: 8px; margin-left: -1px; }
-.crosshair i:nth-child(3) { top: 50%; left: 0; height: 2px; width: 8px; margin-top: -1px; }
-.crosshair i:nth-child(4) { top: 50%; right: 0; height: 2px; width: 8px; margin-top: -1px; }
+.crosshair i:nth-child(1) { left: 50%; top: 50%; width: 2px; height: 7px; margin: -1px 0 0 -1px; transform: translateY(calc(-7px - var(--gap))); }
+.crosshair i:nth-child(2) { left: 50%; top: 50%; width: 2px; height: 7px; margin: -1px 0 0 -1px; transform: translateY(var(--gap)); }
+.crosshair i:nth-child(3) { left: 50%; top: 50%; height: 2px; width: 7px; margin: -1px 0 0 -1px; transform: translateX(calc(-7px - var(--gap))); }
+.crosshair i:nth-child(4) { left: 50%; top: 50%; height: 2px; width: 7px; margin: -1px 0 0 -1px; transform: translateX(var(--gap)); }
+
+/* Optic reticles. Drawn in the HUD rather than on the glass: at 1.25x-4x that
+   is exactly how it reads in the real thing, and it stays crisp at any zoom. */
+.reticle {
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+  opacity: 0; transition: opacity 0.09s ease-out;
+}
+.reticle.show { opacity: 1; }
+.reticle::before, .reticle::after { content: ''; position: absolute; }
+.reticle.dot::before {
+  width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
+  background: #ff4d3d; box-shadow: 0 0 6px rgba(255,77,61,0.9);
+}
+.reticle.circle::before {
+  width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
+  border: 1.5px solid rgba(255,77,61,0.85); box-shadow: 0 0 5px rgba(0,0,0,0.6);
+}
+.reticle.circle::after {
+  width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%;
+  background: #ff4d3d; box-shadow: 0 0 6px rgba(255,77,61,0.9);
+}
+.reticle.chevron::before {
+  width: 14px; height: 14px; margin: -9px 0 0 -7px;
+  border-left: 2px solid #ff4d3d; border-bottom: 2px solid #ff4d3d;
+  transform: rotate(-45deg); box-shadow: -1px 1px 3px rgba(0,0,0,0.7);
+}
+.reticle.chevron::after {
+  width: 1.5px; height: 46px; margin: 10px 0 0 -0.75px;
+  background: linear-gradient(rgba(255,77,61,0.9), rgba(255,77,61,0));
+}
 
 .hitmarker {
   position: absolute; inset: -6px; opacity: 0;

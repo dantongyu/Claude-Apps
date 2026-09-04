@@ -39,6 +39,12 @@ export class PlayerController {
     this._bob = 0;
     this._lastDamageDir = null;
     this.baseFov = camera.fov;
+
+    // Set by the weapon while aiming; null means "use the normal FOV".
+    this.scopeFov = null;
+    this.sprinting = false;
+    // Last frame's mouse delta, so the viewmodel can lag behind the crosshair.
+    this.lastLook = { x: 0, y: 0 };
   }
 
   spawn(position) {
@@ -58,6 +64,8 @@ export class PlayerController {
   }
 
   look(dx, dy, invertY = false) {
+    this.lastLook.x = dx;
+    this.lastLook.y = dy;
     this.yaw -= dx;
     this.pitch -= (invertY ? -dy : dy);
     const lim = Math.PI / 2 - 0.02;
@@ -81,6 +89,7 @@ export class PlayerController {
     const s = (input.down('right') ? 1 : 0) - (input.down('left') ? 1 : 0);
     this.crouching = input.down('crouch') && this.onGround;
     const sprinting = input.down('sprint') && f > 0 && !this.crouching;
+    this.sprinting = sprinting;
 
     const wish = new THREE.Vector3(
       -Math.sin(this.yaw) * f + Math.cos(this.yaw) * s,
@@ -135,7 +144,9 @@ export class PlayerController {
     if (Math.abs(this.recoilPitch) < 1e-5) this.recoilPitch = 0;
 
     this._bob += hs * dt * 1.5;
-    const bobAmt = this.onGround ? Math.min(hs / SPEED.sprint, 1) * 0.045 : 0;
+    const aimDamp = this.scopeFov == null ? 1
+      : Math.max(0.12, this.scopeFov / Math.max(0.001, this.baseFov));
+    const bobAmt = (this.onGround ? Math.min(hs / SPEED.sprint, 1) * 0.045 : 0) * aimDamp;
     const eye = this.crouching ? CROUCH_EYE : EYE_HEIGHT;
 
     this.camera.position.set(

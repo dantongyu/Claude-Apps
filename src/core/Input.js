@@ -13,6 +13,7 @@ const BINDINGS = {
   interact: ['KeyE'],
   drop: ['KeyG'],
   use: ['KeyF'],
+  bag: ['Tab'],
 };
 
 const SLOT_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'];
@@ -22,6 +23,7 @@ export class Input {
     this.element = element;
     this.keys = new Set();
     this.mouseDown = false;
+    this.rightDown = false;
     this.mouseDX = 0;
     this.mouseDY = 0;
     this.wheel = 0;
@@ -46,20 +48,25 @@ export class Input {
       this._pressed.add(e.code);
       const slot = SLOT_KEYS.indexOf(e.code);
       if (slot >= 0) this._slotRequest = slot;
-      // Space scrolls the page otherwise.
-      if (e.code === 'Space' && this.locked) e.preventDefault();
+      // Space scrolls the page and Tab moves browser focus otherwise.
+      if ((e.code === 'Space' || e.code === 'Tab') && this.locked) e.preventDefault();
     });
     this._add(window, 'keyup', (e) => this.keys.delete(e.code));
     this._add(window, 'blur', () => {
       this.keys.clear();
       this.mouseDown = false;
+      this.rightDown = false;
     });
     this._add(this.element, 'mousedown', (e) => {
       if (e.button === 0) this.mouseDown = true;
+      if (e.button === 2) this.rightDown = true;
     });
     this._add(window, 'mouseup', (e) => {
       if (e.button === 0) this.mouseDown = false;
+      if (e.button === 2) this.rightDown = false;
     });
+    // Right-click is aim-down-sights, so it must never open a context menu.
+    this._add(this.element, 'contextmenu', (e) => e.preventDefault());
     this._add(window, 'mousemove', (e) => {
       if (!this.locked) return;
       this.mouseDX += e.movementX * this.sensitivity;
@@ -74,6 +81,7 @@ export class Input {
       if (!this.locked) {
         this.keys.clear();
         this.mouseDown = false;
+        this.rightDown = false;
       }
       this.onLockChange?.(this.locked);
     });

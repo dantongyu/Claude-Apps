@@ -11,6 +11,10 @@ import { Inventory } from '../inventory/Inventory.js';
 import { itemDef, itemName } from '../inventory/Item.js';
 import { ENEMIES } from '../data/enemies.js';
 import { Hud } from '../ui/hud/Hud.js';
+import { ScopeOverlay } from './ScopeOverlay.js';
+import { ViewmodelLayer } from './ViewmodelLayer.js';
+import { weaponEnvironment } from './Environment.js';
+import { setWeaponEnvironment } from './WeaponModel.js';
 
 const RESPAWN_DELAY = 2.2;
 const EXTRACT_RADIUS = 3.4;
@@ -40,6 +44,11 @@ export class Match {
     this.scene.add(this.arena.group);
 
     this.effects = new Effects(this.scene);
+    setWeaponEnvironment(weaponEnvironment(renderer));
+
+    // The held weapon is drawn in its own pass with a fixed narrow camera.
+    this.viewmodels = new ViewmodelLayer();
+    this.viewmodels.resize(window.innerWidth, window.innerHeight);
 
     this.player = new PlayerController(this.camera, this.arena.colliders, this.arena.half);
     this.player.spawn(this.arena.playerSpawn);
@@ -72,6 +81,7 @@ export class Match {
     this.spawnTimer = 1.5;
     this.stats = { kills: 0, chests: 0, headshots: 0, damage: 0, time: 0 };
 
+    this.scope = null;
     this.useTimer = 0;
     this.useItem = null;
     this.deathTimer = 0;
@@ -90,6 +100,7 @@ export class Match {
       scene: this.scene,
       effects: this.effects,
       arena: this.arena,
+      viewmodels: this.viewmodels,
       enemies: this.enemies,
       player: this.player,
       inventory: this.inventory,
@@ -163,8 +174,8 @@ export class Match {
 
     // Spawn out of the player's immediate view so bots don't pop in on top of them.
     const candidates = this.arena.enemySpawns
-      .filter((s) => s.distanceTo(this.player.pos) > 18)
-      .sort(() => this.rng.next() - 0.5);
+      .filter((s) => s.distanceTo(this.player.pos) > 18);
+    this.rng.shuffle(candidates);
     const spot = candidates[0] ?? this.rng.pick(this.arena.enemySpawns);
 
     const typeId = this.rng.pick(cfg.types);
@@ -278,11 +289,15 @@ export class Match {
     this.stats.time += dt;
 
     if (this.player.alive) {
+      // Aiming slows the mouse in proportion to magnification, or an 8x scope
+      // is unusable.
       const look = this.input.takeMouseDelta();
-      this.player.look(look.x, look.y, this.profile.settings.invertY);
+      const aim = this.weapon?.aimSensitivity ?? 1;
+      this.player.look(look.x * aim, look.y * aim, this.profile.settings.invertY);
       this.player.update(dt, this.input);
       this._handleActions(dt);
-      this.weapon?.update(dt, this.input.mouseDown && !this.useItem);
+      const ads = this.input.rightDown && !this.useItem;
+      this.weapon?.update(dt, this.input.mouseDown && !this.useItem, ads);
     } else {
       this.deathTimer -= dt;
       this.hud.setPrompt(null);
@@ -320,6 +335,7 @@ export class Match {
 
     this.hud.vitals(this.player.health, this.player.shield);
     this.hud.ammo(this.weapon);
+    this.hud.aimState(this.weapon, this.camera.fov);
     this.hud.hotbarState(this.inventory);
     this.hud.objectiveList(this.objectives.view());
     this.hud.update(dt);
@@ -329,11 +345,24 @@ export class Match {
 
   render() {
     this.renderer.render(this.scene, this.camera);
+
+    // Scoped in, the sight picture replaces the gun entirely.
+    if (this.weapon?.scopeActive) {
+      if (!this.scope) {
+        this.scope = new ScopeOverlay(this.renderer);
+        this.scope.resize(window.innerWidth, window.innerHeight);
+      }
+      this.scope.render(this.scene, this.camera, this.player.baseFov / this.weapon.zoom);
+    } else {
+      this.viewmodels.render(this.renderer);
+    }
   }
 
   resize(w, h) {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.viewmodels.resize(w, h);
+    this.scope?.resize(w, h);
   }
 
   setPaused(paused) {
@@ -367,6 +396,9 @@ export class Match {
   dispose() {
     this.weapon?.dispose();
     this.weapon = null;
+    this.scope?.dispose();
+    this.scope = null;
+    this.viewmodels.dispose();
     for (const e of this.enemies) e.dispose();
     this.enemies = [];
     this.loot.dispose();

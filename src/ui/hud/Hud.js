@@ -22,6 +22,10 @@ export class Hud {
     this.crosshair.appendChild(this.hitmarker);
     this.root.appendChild(this.crosshair);
 
+    // Optic reticles replace the crosshair while aiming.
+    this.reticle = el('div', 'reticle');
+    this.root.appendChild(this.reticle);
+
     this.damageFlash = el('div', 'damage-flash');
     this.root.appendChild(this.damageFlash);
 
@@ -126,6 +130,29 @@ export class Hud {
     if (weapon.isReloading) this.reloadHint.textContent = 'RELOADING';
     else if (weapon.mag === 0) this.reloadHint.textContent = weapon.reserve > 0 ? 'PRESS R' : 'NO AMMO';
     else this.reloadHint.textContent = '';
+  }
+
+  // Crosshair bloom, and swapping in the optic's reticle while aiming. `fov` is
+  // the camera's live (zoomed) field of view, which is what turns a spread cone
+  // in radians into a gap in pixels.
+  aimState(weapon, fov = 78) {
+    if (!weapon) {
+      this.crosshair.classList.remove('hidden');
+      this.reticle.className = 'reticle';
+      return;
+    }
+    const halfPx = window.innerHeight / 2;
+    const halfFov = Math.tan((fov * Math.PI / 180) / 2);
+    const px = (Math.tan(weapon.currentSpread()) / Math.max(1e-6, halfFov)) * halfPx;
+    this.crosshair.style.setProperty('--gap', `${Math.min(70, 3 + px).toFixed(1)}px`);
+
+    const ads = weapon.ads ?? 0;
+    const scoped = !!weapon.scopeActive;
+    this.crosshair.classList.toggle('hidden', scoped || ads > 0.35);
+
+    const kind = weapon.optic?.reticle;
+    const showOptic = !scoped && ads > 0.5 && kind && kind !== 'iron';
+    this.reticle.className = showOptic ? `reticle show ${kind}` : 'reticle';
   }
 
   hotbarState(inventory) {
