@@ -100,6 +100,12 @@ SUITES = [
         'test': 'logic.test.js',
     },
     {
+        'name': 'net',
+        'prelude': BASE_PRELUDE,
+        'modules': ['net/Protocol.js', 'net/Interpolator.js'],
+        'test': 'net.test.js',
+    },
+    {
         'name': 'physics',
         'prelude': BASE_PRELUDE + THREE_STUB,
         'modules': ['game/Physics.js'],
